@@ -1,0 +1,20 @@
+services:
+  - type: web_service
+    name: mxodontologia-web
+    env: python
+    plan: starter
+    region: oregon
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    startCommand: "gunicorn mxodontologia.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        value: "replace_with_real_secret"
+      - key: ALLOWED_HOSTS
+        value: "your-app.onrender.com"
+      - key: DATABASE_URL
+        value: "replace_with_render_database_url"
+      - key: RENDER_EXTERNAL_HOSTNAME
+        value: "your-app.onrender.com"
+    autoDeploy: true

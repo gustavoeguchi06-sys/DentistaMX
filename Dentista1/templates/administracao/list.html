@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Administração - MX Odontologia Pro{% endblock %}
+
+{% block header %}Administração{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <h2>Configurações da Clínica</h2>
+    <div class="page-actions">
+      <a class="button" href="{% url 'administracao_add' %}">Adicionar Usuário</a>
+      <a class="button secondary" href="{% url 'administracao_permissoes' %}">Permissões</a>
+    </div>
+  </div>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Função</th>
+            <th>Último Login</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for usuario in usuarios %}
+            <tr>
+              <td>{{ usuario.nome }}</td>
+              <td>{{ usuario.funcao }}</td>
+              <td>{{ usuario.ultimo_login|date:'d/m/Y' }}</td>
+              <td><span class="tag {{ usuario.status|lower }}">{{ usuario.status }}</span></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Nenhum usuário cadastrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatórios - MX Odontologia Pro{% endblock %}
+
+{% block header %}Relatórios{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <h2>Análises e Indicadores</h2>
+    <div class="page-actions">
+      <a class="button" href="{% url 'relatorio_add' %}">Gerar Relatório</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <article class="panel chart-card">
+      <div class="chart-placeholder">Relatório de receitas</div>
+    </article>
+    <article class="panel chart-card">
+      <div class="chart-placeholder">Relatório de atendimentos</div>
+    </article>
+  </div>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Relatório</th>
+            <th>Período</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for relatorio in relatorios %}
+            <tr>
+              <td>{{ relatorio.nome }}</td>
+              <td>{{ relatorio.periodo }}</td>
+              <td><span class="tag {{ relatorio.status|lower }}">{{ relatorio.status }}</span></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="3">Nenhum relatório disponível.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}

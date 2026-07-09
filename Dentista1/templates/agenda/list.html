@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Agenda - MX Odontologia Pro{% endblock %}
+
+{% block header %}Agenda{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <h2>Compromissos do Dia</h2>
+    <div class="page-actions">
+      <a class="button" href="{% url 'agenda_add' %}">Novo Agendamento</a>
+    </div>
+  </div>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Horário</th>
+            <th>Paciente</th>
+            <th>Procedimento</th>
+            <th>Responsável</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for consulta in consultas %}
+            <tr>
+              <td>{{ consulta.data_consulta|date:'H:i' }}</td>
+              <td>{{ consulta.paciente.nome }}</td>
+              <td>{{ consulta.procedimento }}</td>
+              <td>{{ consulta.dentista }}</td>
+              <td><span class="tag {{ consulta.status|lower }}">{{ consulta.status }}</span></td>
+              <td>
+                <button class="btn-delete" onclick="confirmDelete('{% url 'consulta_delete' consulta.id %}', '{{ consulta.paciente.nome }}')">
+                  🗑️ Excluir
+                </button>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">Nenhum agendamento registrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <style>
+    .btn-delete {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background-color 0.2s;
+    }
+    .btn-delete:hover {
+      background-color: #c82333;
+    }
+  </style>
+
+  <script>
+    function confirmDelete(url, name) {
+      if (confirm(`Tem certeza que deseja excluir o agendamento de "${name}"?`)) {
+        window.location.href = url;
+      }
+    }
+  </script>
+{% endblock %}

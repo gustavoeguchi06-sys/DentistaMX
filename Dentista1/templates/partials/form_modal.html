@@ -1,0 +1,31 @@
+{% if form %}
+<article class="panel">
+  <div class="panel-header">
+    <div>
+      <h3>{{ title }}</h3>
+      <p class="panel-subtitle">Preencha os campos abaixo para registrar as informações com rapidez.</p>
+    </div>
+  </div>
+  <form method="post" novalidate>
+    {% csrf_token %}
+    <div class="form-grid">
+      {% for field in form %}
+        <div class="form-group">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.help_text %}
+            <small>{{ field.help_text }}</small>
+          {% endif %}
+          {% for error in field.errors %}
+            <div class="error">{{ error }}</div>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="page-actions">
+      <button class="button" type="submit">Salvar</button>
+      <a class="button secondary" href="{{ cancel_url }}">Cancelar</a>
+    </div>
+  </form>
+</article>
+{% endif %}

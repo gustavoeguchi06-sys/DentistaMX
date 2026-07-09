@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatório de Uso do Estoque - MX Odontologia Pro{% endblock %}
+
+{% block header %}Relatório de Uso do Estoque{% endblock %}
+
+{% block content %}
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Quantidade</th>
+            <th>Unidade</th>
+            <th>Alerta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+            <tr>
+              <td>{{ item.nome }}</td>
+              <td>{{ item.quantidade }}</td>
+              <td>{{ item.unidade }}</td>
+              <td>{{ item.nivel_alerta }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Nenhum item em nível de alerta encontrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}

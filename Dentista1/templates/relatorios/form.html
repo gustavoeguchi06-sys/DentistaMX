@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Gerar Relatório - MX Odontologia Pro{% endblock %}
+
+{% block header %}Gerar Relatório{% endblock %}
+
+{% block content %}
+  {% include 'partials/form_modal.html' with title='Gerar Relatório' form=form cancel_url=cancel_url %}
+{% endblock %}

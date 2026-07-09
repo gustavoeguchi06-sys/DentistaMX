@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Verificar Páginas{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+  <h1>Relatório de Verificação</h1>
+  <p>Resultados das requisições internas às rotas principais.</p>
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th>Rota</th>
+      <th>Status</th>
+      <th>Título</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in results %}
+    <tr>
+      <td>{{ r.path }}</td>
+      <td>{{ r.status }}</td>
+      <td>{{ r.title|default:'-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

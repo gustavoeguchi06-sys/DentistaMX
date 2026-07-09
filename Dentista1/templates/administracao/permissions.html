@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Permissões - MX Odontologia Pro{% endblock %}
+
+{% block header %}Permissões{% endblock %}
+
+{% block content %}
+  {% include 'partials/form_modal.html' with title='Permissões de Usuário' form=form cancel_url=cancel_url %}
+{% endblock %}

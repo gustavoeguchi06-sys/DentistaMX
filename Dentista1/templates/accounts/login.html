@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+  <h2>Entrar</h2>
+  <p>Faça login para acessar o sistema com a mesma experiência de um painel SaaS.</p>
+</div>
+
+<div class="auth-grid">
+  <article class="auth-panel">
+    <h3>Login</h3>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="field">
+        <label for="id_username">Usuário</label>
+        {{ form.username }}
+      </div>
+      <div class="field">
+        <label for="id_password">Senha</label>
+        {{ form.password }}
+      </div>
+      <button type="submit" class="button">Entrar</button>
+      <p class="panel-subtitle" style="margin-top: 14px; text-align: center;">Não tem conta? <a href="{% url 'register' %}">Crie uma conta</a>.</p>
+    </form>
+  </article>
+</div>
+{% endblock %}

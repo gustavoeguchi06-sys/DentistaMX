@@ -1,0 +1,9 @@
+[build]
+  command = "python -m pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput"
+  publish = "staticfiles"
+
+# Este repositório precisa de um runtime/adaptador no Netlify para responder rotas Django.
+# O build acima prepara o app, mas a execução das rotas ainda depende de um processo como:
+#   gunicorn mxodontologia.wsgi
+
+

@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatório Financeiro - MX Odontologia Pro{% endblock %}
+
+{% block header %}Relatório Financeiro Mensal{% endblock %}
+
+{% block content %}
+  <article class="panel">
+    <div class="status-block">
+      <p>Período: <strong>{{ periodo }}</strong></p>
+      <p>Receitas: <strong>R$ {{ receitas }}</strong></p>
+      <p>Despesas: <strong>R$ {{ despesas }}</strong></p>
+      <p>Saldo: <strong>R$ {{ saldo }}</strong></p>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for transacao in mensal %}
+            <tr>
+              <td>{{ transacao.data_operacao|date:'d/m/Y' }}</td>
+              <td>{{ transacao.descricao }}</td>
+              <td>{{ transacao.tipo }}</td>
+              <td>R$ {{ transacao.valor }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Nenhuma transação registrada neste mês.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block title %}Financeiro - MX Odontologia Pro{% endblock %}
+
+{% block header %}Financeiro{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <h2>Controle Financeiro</h2>
+    <div class="page-actions">
+      <a class="button" href="{% url 'financeiro_add' %}">Novo Recebimento</a>
+      <a class="button secondary" href="{% url 'financeiro_relatorio' %}">Relatório Mensal</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <article class="panel">
+      <div class="status-block">
+        <p>Receitas do mês: <strong>R$ {{ receitas }}</strong></p>
+        <p>Despesas do mês: <strong>R$ {{ despesas }}</strong></p>
+        <p>Lucro Atual: <strong>R$ {{ saldo }}</strong></p>
+      </div>
+    </article>
+    <article class="panel chart-card">
+      <div class="chart-placeholder">Gráfico de receitas e despesas aqui</div>
+    </article>
+  </div>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th>Tipo</th>
+            <th>Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for transacao in transacoes %}
+            <tr>
+              <td>{{ transacao.data_operacao|date:'d/m/Y' }}</td>
+              <td>{{ transacao.descricao }}</td>
+              <td>{{ transacao.tipo }}</td>
+              <td>R$ {{ transacao.valor }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Nenhuma transação encontrada.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}

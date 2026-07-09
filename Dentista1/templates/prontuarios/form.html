@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Novo Prontuário - MX Odontologia Pro{% endblock %}
+
+{% block header %}Novo Prontuário{% endblock %}
+
+{% block content %}
+  {% include 'partials/form_modal.html' with title='Novo Prontuário' form=form cancel_url=cancel_url %}
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar conta{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+  <h2>Registre-se</h2>
+  <p>Crie uma conta para acessar o sistema com uma experiência mais moderna e organizada.</p>
+</div>
+
+<div class="auth-grid">
+  <article class="auth-panel">
+    <h3>Criar conta</h3>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="field">
+        <label for="id_username">Nome de usuário</label>
+        {{ form.username }}
+      </div>
+      <div class="field">
+        <label for="id_password1">Senha</label>
+        {{ form.password1 }}
+      </div>
+      <div class="field">
+        <label for="id_password2">Repita a senha</label>
+        {{ form.password2 }}
+      </div>
+      <button type="submit" class="button">Criar conta</button>
+      <p class="panel-subtitle" style="margin-top: 14px; text-align: center;">Já tem conta? <a href="{% url 'login' %}">Faça login</a>.</p>
+    </form>
+  </article>
+</div>
+{% endblock %}

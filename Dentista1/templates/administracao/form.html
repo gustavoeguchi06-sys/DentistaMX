@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Adicionar Usuário - MX Odontologia Pro{% endblock %}
+
+{% block header %}Adicionar Usuário{% endblock %}
+
+{% block content %}
+  {% include 'partials/form_modal.html' with title='Adicionar Usuário' form=form cancel_url=cancel_url %}
+{% endblock %}

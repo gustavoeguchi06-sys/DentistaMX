@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar Entrada - MX Odontologia Pro{% endblock %}
+
+{% block header %}Registrar Entrada{% endblock %}
+
+{% block content %}
+  {% include 'partials/form_modal.html' with title='Registrar Entrada' form=form cancel_url=cancel_url %}
+{% endblock %}

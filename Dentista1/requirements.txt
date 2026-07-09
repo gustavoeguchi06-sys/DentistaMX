@@ -1,0 +1,7 @@
+Django>=6.0
+psycopg[binary]
+dj-database-url
+
+gunicorn
+waitress
+whitenoise

@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+
+{% block title %}Pacientes - MX Odontologia Pro{% endblock %}
+
+{% block header %}Pacientes{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-intro">
+      <h2>Lista de Pacientes</h2>
+      <p>Cadastre e acompanhe pacientes com dados organizados e prontos para atendimento.</p>
+    </div>
+    <div class="page-actions">
+      <a class="button" href="{% url 'paciente_add' %}">Adicionar Paciente</a>
+      <a class="button secondary" href="{% url 'pacientes_export' %}">Exportar CSV</a>
+    </div>
+  </div>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th>
+            <th>Idade</th>
+            <th>Data Nascimento</th>
+            <th>Especialidade</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for paciente in pacientes %}
+            <tr>
+              <td>{{ paciente.nome }}</td>
+              <td>{{ paciente.idade }}</td>
+              <td>{{ paciente.data_nascimento|date:'d/m/Y' }}</td>
+              <td>{{ paciente.especialidade }}</td>
+              <td><span class="tag {{ paciente.status|lower }}">{{ paciente.status }}</span></td>
+              <td>
+                <button class="btn-delete" onclick="confirmDelete('{% url 'paciente_delete' paciente.id %}', '{{ paciente.nome }}')">
+                  <i class="fa fa-trash"></i> Excluir
+                </button>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <div class="empty-state-icon">🦷</div>
+                  <h3>Nenhum paciente cadastrado ainda</h3>
+                  <p>Comece adicionando o primeiro cadastro para estruturar seu fluxo de atendimento.</p>
+                  <a class="button" href="{% url 'paciente_add' %}">Adicionar primeiro paciente</a>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+
+  <script>
+    function confirmDelete(url, name) {
+      if (confirm(`Tem certeza que deseja excluir o paciente "${name}"?`)) {
+        window.location.href = url;
+      }
+    }
+  </script>
+{% endblock %}

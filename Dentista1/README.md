@@ -1,0 +1,109 @@
+# MX Odontologia Pro
+
+Sistema de gestão odontológica construído com Django. O projeto está organizado com uma estrutura padrão de backend, templates reutilizáveis, arquivos estáticos e um app principal para operações da clínica.
+
+## Visão geral
+
+O projeto inclui:
+- Estrutura Django padrão (`manage.py`, `mxodontologia/`, app `clinic/`)
+- Templates em `templates/`
+- CSS em `static/`
+- Dashboard e páginas para pacientes, agenda, prontuários, estoque, financeiro, relatórios e administração
+- Funções de cadastro, criação de registros e exportação CSV
+- Configuração pronta para deploy no Render com PostgreSQL
+
+## Requisitos
+
+- Python 3.14+
+- Django 6.0+
+- PostgreSQL para produção
+- Virtualenv (recomendado)
+
+## Instalação local
+
+1. Clone o projeto:
+   ```bash
+   git clone <repo> .
+   ```
+
+2. Crie e ative o ambiente virtual:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\Activate.ps1
+   ```
+
+3. Instale dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Crie um arquivo `.env` a partir de `.env.example` e ajuste as credenciais PostgreSQL:
+   ```bash
+   copy .env.example .env
+   ```
+
+5. Para usar PostgreSQL local, defina `DATABASE_URL` ou as variáveis individuais `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` e `POSTGRES_PORT`.
+
+6. Se quiser usar SQLite apenas para testes rápidos, adicione `USE_SQLITE_FALLBACK=true` em `.env`.
+
+7. Rode as migrations:
+   ```bash
+   python manage.py migrate
+   ```
+
+8. Execute o servidor:
+   ```bash
+   python manage.py runserver
+   ```
+
+9. Acesse `http://127.0.0.1:8000/`.
+
+## Deploy no Render
+
+O projeto já está configurado para Render usando `render.yaml`.
+
+- Build command: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
+- Start command: `gunicorn mxodontologia.wsgi:application --bind 0.0.0.0:$PORT`
+
+Variáveis de ambiente recomendadas:
+- `SECRET_KEY`
+- `DEBUG=False`
+- `ALLOWED_HOSTS=your-app.onrender.com`
+- `DATABASE_URL=postgres://user:password@host:port/dbname`
+- `RENDER_EXTERNAL_HOSTNAME=your-app.onrender.com`
+
+No Render, ligue o serviço de banco PostgreSQL e copie a URL gerada para `DATABASE_URL`.
+
+## Estrutura de pastas
+
+- `mxodontologia/` - configurações do projeto
+- `clinic/` - app principal com models, views, forms e URLs
+- `templates/` - arquivos HTML do frontend
+- `static/` - CSS e outros ativos
+
+## Banco de dados
+
+O projeto usa PostgreSQL no deploy.
+
+Para o Render, configure o banco PostgreSQL no painel e use a variável `DATABASE_URL`.
+
+Para testes locais rápidos sem PostgreSQL, defina `USE_SQLITE_FALLBACK=true` em `.env`, mas em produção o recomendado é usar PostgreSQL.
+
+## Status atual
+
+- Páginas principais e formulários já conectados ao banco
+- Exportação de pacientes para CSV implementada
+- Responsividade em celular melhorada
+- Validação de campo de nome/número adicionada aos formulários
+
+## Próximos passos
+
+- Adicionar edição/exclusão de registros
+- Implementar autenticação de usuário
+- Criar relatórios mais avançados e filtros dinâmicos
+- Refatorar interfaces para maior usabilidade móvel
+
+
+## atualização de testes
+
+teste de sincronização

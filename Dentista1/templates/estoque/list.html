@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Estoque - MX Odontologia Pro{% endblock %}
+
+{% block header %}Estoque{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <h2>Gerenciamento de Insumos</h2>
+    <div class="page-actions">
+      <a class="button" href="{% url 'estoque_add' %}">Registrar Entrada</a>
+      <a class="button secondary" href="{% url 'estoque_relatorio' %}">Relatório de Uso</a>
+    </div>
+  </div>
+
+  <article class="panel">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Quantidade</th>
+            <th>Unidade</th>
+            <th>Alerta</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in itens %}
+            <tr>
+              <td>{{ item.nome }}</td>
+              <td>{{ item.quantidade }}</td>
+              <td>{{ item.unidade }}</td>
+              <td><span class="tag {{ item.nivel_alerta|lower }}">{{ item.nivel_alerta }}</span></td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4">Nenhum insumo registrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}

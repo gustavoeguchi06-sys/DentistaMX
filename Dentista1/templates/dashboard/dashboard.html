@@ -1,0 +1,339 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - MX Odontologia Pro{% endblock %}
+
+{% block header %}Painel Administrativo{% endblock %}
+
+{% block content %}
+
+  {% if user.is_authenticated %}
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-content">
+        <div>
+          <p class="eyebrow">Plataforma completa</p>
+          <h2 id="hero-title">Sistema de Gestão Odontológica, com experiência de SaaS.</h2>
+          <p>Centralize agenda, pacientes, estoque e finanças em um painel elegante, rápido e preparado para crescer.</p>
+        </div>
+        <div class="hero-badges">
+          <span><i class="fa fa-shield-alt"></i> Segurança</span>
+          <span><i class="fa fa-bolt"></i> Agilidade</span>
+          <span><i class="fa fa-mobile-alt"></i> Responsivo</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="quick-actions" aria-label="Ações rápidas">
+      <a class="button" href="{% url 'pacientes' %}">Ver pacientes</a>
+      <a class="button secondary" href="{% url 'agenda' %}">Abrir agenda</a>
+      <a class="button secondary" href="{% url 'financeiro' %}">Finanças</a>
+      <button id="open-all" class="button secondary">Abrir todas as páginas</button>
+    </section>
+
+    <section class="cards" aria-label="Resumo rápido">
+      <a class="card" href="{% url 'pacientes' %}">
+        <div class="card-icon"><i class="fa fa-users"></i></div>
+        <p>Pacientes</p>
+        <h3>{{ pacientes_count|default:'0' }}</h3>
+      </a>
+      <a class="card" href="{% url 'agenda' %}">
+        <div class="card-icon"><i class="fa fa-calendar"></i></div>
+        <p>Agenda hoje</p>
+        <h3>{{ agenda_count|default:'0' }}</h3>
+      </a>
+      <a class="card" href="{% url 'financeiro' %}">
+        <div class="card-icon"><i class="fa fa-dollar-sign"></i></div>
+        <p>Financeiro</p>
+        <h3>R$ {{ receitas|floatformat:2 }}</h3>
+      </a>
+      <a class="card" href="{% url 'estoque' %}">
+        <div class="card-icon"><i class="fa fa-box"></i></div>
+        <p>Alertas</p>
+        <h3>{{ stock_alert_count|default:'0' }}</h3>
+      </a>
+      <a class="card" href="{% url 'prontuarios' %}">
+        <div class="card-icon"><i class="fa fa-file-medical"></i></div>
+        <p>Prontuários</p>
+        <h3>{{ prontuarios_count|default:'0' }}</h3>
+      </a>
+      <a class="card" href="{% url 'relatorios' %}">
+        <div class="card-icon"><i class="fa fa-chart-pie"></i></div>
+        <p>Relatórios</p>
+        <h3>{{ relatorios_count|default:'0' }}</h3>
+      </a>
+      <a class="card" href="{% url 'administracao' %}">
+        <div class="card-icon"><i class="fa fa-user-shield"></i></div>
+        <p>Administração</p>
+        <h3>Usuários</h3>
+      </a>
+    </section>
+
+    <section class="grid">
+      <article class="panel" aria-labelledby="agenda-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="agenda-title">Agenda do Dia</h3>
+            <p class="panel-subtitle">Visualize os atendimentos agendados para hoje.</p>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Horário</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for consulta in agenda_today %}
+                <tr>
+                  <td>{{ consulta.paciente.nome }}</td>
+                  <td>{{ consulta.data_consulta|date:'H:i' }}</td>
+                  <td><span class="tag {{ consulta.status|lower }}">{{ consulta.status }}</span></td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="3">Nenhum agendamento registrado para hoje.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="panel" aria-labelledby="patients-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="patients-title">Pacientes Recentes</h3>
+            <p class="panel-subtitle">Últimos pacientes cadastrados.</p>
+          </div>
+        </div>
+        <div class="patient-list">
+          {% for paciente in recent_pacientes %}
+            <div class="patient">
+              <span>{{ paciente.nome }}</span>
+              <span>{{ paciente.especialidade|default:'Sem especialidade' }}</span>
+            </div>
+          {% empty %}
+            <div class="empty-state">
+              <div class="empty-state-icon">🧾</div>
+              <h3>Nenhum paciente cadastrado</h3>
+              <p>Adicione pacientes na página de Pacientes para ver os dados aqui.</p>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    </section>
+
+    <section class="grid">
+      <article class="panel" aria-labelledby="finance-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="finance-title">Fluxo Financeiro</h3>
+            <p class="panel-subtitle">Resumo mensal das receitas e despesas.</p>
+          </div>
+        </div>
+        <div class="status-block">
+          <p>Receitas do mês: <strong>R$ {{ receitas|floatformat:2 }}</strong></p>
+          <p>Despesas do mês: <strong>R$ {{ despesas|floatformat:2 }}</strong></p>
+          <p>Lucro Atual: <strong>R$ {{ saldo|floatformat:2 }}</strong></p>
+        </div>
+      </article>
+
+      <article class="panel chart-card" aria-labelledby="finance-chart-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="finance-chart-title">Gráfico Financeiro</h3>
+            <p class="panel-subtitle">Receitas x despesas por dia do mês atual.</p>
+          </div>
+        </div>
+        <canvas id="dashboardFinanceChart" width="400" height="220"></canvas>
+      </article>
+
+      <article class="panel" aria-labelledby="stock-title">
+        <div class="panel-header">
+          <div>
+            <h3 id="stock-title">Alertas de Estoque</h3>
+            <p class="panel-subtitle">Itens com nível crítico ou baixo.</p>
+          </div>
+        </div>
+        <div class="patient-list">
+          {% for item in low_stock_items %}
+            <div class="patient">
+              <span>{{ item.nome }}</span>
+              <span>{{ item.quantidade }} {{ item.unidade|default:'un' }}</span>
+            </div>
+          {% empty %}
+            <div class="empty-state">
+              <div class="empty-state-icon">✅</div>
+              <h3>Sem alertas no estoque</h3>
+              <p>Os níveis de estoque estão dentro do normal no momento.</p>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    </section>
+  {% else %}
+    <section class="hero hero-compact" aria-labelledby="hero-title">
+      <div class="hero-content">
+        <div>
+          <p class="eyebrow">Bem-vindo</p>
+          <h2 id="hero-title">Tudo o que sua clínica precisa, em um único lugar.</h2>
+          <p>Entre ou crie sua conta para começar.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="auth-grid">
+      <article class="auth-panel">
+        <h3>Login</h3>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {{ login_form.non_field_errors }}
+          <input type="hidden" name="form_type" value="login">
+          <input type="hidden" name="next" value="{{ next }}">
+          <div class="field">
+            {{ login_form.username.label_tag }}
+            {{ login_form.username }}
+            {{ login_form.username.errors }}
+          </div>
+          <div class="field">
+            {{ login_form.password.label_tag }}
+            {{ login_form.password }}
+            {{ login_form.password.errors }}
+          </div>
+          <button class="button" type="submit">Entrar</button>
+        </form>
+      </article>
+
+      <article class="auth-panel secondary-panel">
+        <h3>Registrar</h3>
+        <form method="post" novalidate>
+          {% csrf_token %}
+          {{ register_form.non_field_errors }}
+          <input type="hidden" name="form_type" value="register">
+          <input type="hidden" name="next" value="{{ next }}">
+          <div class="field">
+            {{ register_form.username.label_tag }}
+            {{ register_form.username }}
+            {{ register_form.username.errors }}
+          </div>
+          <div class="field">
+            {{ register_form.password1.label_tag }}
+            {{ register_form.password1 }}
+            {{ register_form.password1.errors }}
+          </div>
+          <div class="field">
+            {{ register_form.password2.label_tag }}
+            {{ register_form.password2 }}
+            {{ register_form.password2.errors }}
+          </div>
+          <button class="button secondary" type="submit">Criar conta</button>
+        </form>
+      </article>
+    </section>
+
+    <section class="demo-info">
+      <p>Use o demo abaixo para testar o projeto:</p>
+      <p><strong>Usuário:</strong> {{ demo_user }}</p>
+      <p><strong>Senha:</strong> {{ demo_password }}</p>
+    </section>
+  {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    (function(){
+      const openAll = document.getElementById('open-all');
+      if(!openAll) return;
+      const urls = [
+        '{% url "pacientes" %}',
+        '{% url "agenda" %}',
+        '{% url "prontuarios" %}',
+        '{% url "estoque" %}',
+        '{% url "financeiro" %}',
+        '{% url "relatorios" %}',
+        '{% url "administracao" %}'
+      ];
+      openAll.addEventListener('click', function(){
+        urls.forEach(u => window.open(u, '_blank'));
+      });
+    })();
+
+    document.addEventListener('DOMContentLoaded', function () {
+      const labelsEl = document.getElementById('dashboardChartLabels');
+      const receitasEl = document.getElementById('dashboardChartReceitas');
+      const despesasEl = document.getElementById('dashboardChartDespesas');
+      const ctx = document.getElementById('dashboardFinanceChart');
+
+      if (!ctx || !labelsEl || !receitasEl || !despesasEl) return;
+
+      const labels = JSON.parse(labelsEl.textContent || '[]');
+      const receitas = JSON.parse(receitasEl.textContent || '[]');
+      const despesas = JSON.parse(despesasEl.textContent || '[]');
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Receitas',
+              data: receitas,
+              backgroundColor: 'rgba(34, 197, 94, 0.7)',
+              borderColor: 'rgba(34, 197, 94, 1)',
+              borderWidth: 1,
+            },
+            {
+              label: 'Despesas',
+              data: despesas,
+              backgroundColor: 'rgba(239, 68, 68, 0.65)',
+              borderColor: 'rgba(239, 68, 68, 1)',
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function (value) { return 'R$ ' + value; }
+              }
+            }
+          },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+              callbacks: {
+                label: function (context) {
+                  return context.dataset.label + ': R$ ' + context.formattedValue;
+                }
+              }
+            }
+          }
+        }
+      });
+    });
+  </script>
+  {% if chart_labels is not None %}
+    {{ chart_labels|json_script:'dashboardChartLabels' }}
+  {% else %}
+    <script id="dashboardChartLabels" type="application/json">[]</script>
+  {% endif %}
+  {% if chart_receitas is not None %}
+    {{ chart_receitas|json_script:'dashboardChartReceitas' }}
+  {% else %}
+    <script id="dashboardChartReceitas" type="application/json">[]</script>
+  {% endif %}
+  {% if chart_despesas is not None %}
+    {{ chart_despesas|json_script:'dashboardChartDespesas' }}
+  {% else %}
+    <script id="dashboardChartDespesas" type="application/json">[]</script>
+  {% endif %}
+{% endblock %}

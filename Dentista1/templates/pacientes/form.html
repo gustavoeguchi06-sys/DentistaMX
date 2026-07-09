@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+
+{% block title %}Adicionar Paciente - MX Odontologia Pro{% endblock %}
+
+{% block header %}Adicionar Paciente{% endblock %}
+
+{% block content %}
+  {% include 'partials/form_modal.html' with title='Adicionar Paciente' form=form cancel_url=cancel_url %}
+{% endblock %}
