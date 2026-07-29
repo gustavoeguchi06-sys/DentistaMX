@@ -46,20 +46,13 @@ if not DEBUG and (not SECRET_KEY or SECRET_KEY.startswith('django-insecure')):
     )
 SECRET_KEY = SECRET_KEY or 'django-insecure-somente-para-desenvolvimento-local'
 
-# Hosts aceitos no deploy
-# - Netlify costuma expor o domínio via URL (ou você pode setar ALLOWED_HOSTS no Netlify)
-# - Mantemos localhost para desenvolvimento
+# Hosts aceitos. localhost fica sempre presente para o desenvolvimento; os
+# domínios de produção vêm de ALLOWED_HOSTS e de RENDER_EXTERNAL_HOSTNAME.
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '[::1]']
 for host in os.getenv('ALLOWED_HOSTS', '').split(','):
     candidate = host.strip()
     if candidate:
         ALLOWED_HOSTS.append(candidate)
-
-NETLIFY_SITE_URL = os.getenv('URL') or os.getenv('NETLIFY_SITE_URL')
-if NETLIFY_SITE_URL:
-    NETLIFY_HOST = NETLIFY_SITE_URL.replace('https://', '').replace('http://', '').strip('/').split('/')[0]
-    if NETLIFY_HOST and NETLIFY_HOST not in ALLOWED_HOSTS:
-        ALLOWED_HOSTS.append(NETLIFY_HOST)
 
 ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
