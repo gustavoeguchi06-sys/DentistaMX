@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  qualidade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Testes
+        env:
+          DEBUG: 'True'
+          USE_SQLITE_FALLBACK: 'true'
+        run: python manage.py test
+
+      # Roda com DEBUG=False para validar exatamente a configuração de produção:
+      # HSTS, redirect de HTTPS, cookies seguros e força da SECRET_KEY.
+      - name: Checagem de deploy
+        env:
+          DEBUG: 'False'
+          SECRET_KEY: ${{ secrets.CI_SECRET_KEY || 'chave-apenas-para-checagem-do-ci-nao-usada-em-runtime-1234567890' }}
+          ALLOWED_HOSTS: example.com
+          USE_SQLITE_FALLBACK: 'true'
+        run: python manage.py check --deploy --fail-level WARNING
+
+      - name: Migrações sincronizadas com os models
+        env:
+          DEBUG: 'True'
+          USE_SQLITE_FALLBACK: 'true'
+        run: python manage.py makemigrations --check --dry-run

@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Trocar senha - MX Odontologia{% endblock %}
+
+{% block header %}Trocar senha{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+  <h2>{% if obrigatorio %}Defina uma nova senha{% else %}Trocar senha{% endif %}</h2>
+  <p>
+    {% if obrigatorio %}
+      Por segurança, você precisa definir uma nova senha antes de continuar.
+    {% else %}
+      Atualize sua senha de acesso quando quiser.
+    {% endif %}
+  </p>
+</div>
+
+<div class="auth-grid auth-grid-single">
+  <article class="auth-panel">
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      <div class="field">
+        {{ form.nova_senha.label_tag }}
+        {{ form.nova_senha }}
+        {% for error in form.nova_senha.errors %}<div class="error">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="field">
+        {{ form.confirmar_senha.label_tag }}
+        {{ form.confirmar_senha }}
+        {% for error in form.confirmar_senha.errors %}<div class="error">{{ error }}</div>{% endfor %}
+      </div>
+      <button class="button" type="submit">Salvar nova senha</button>
+    </form>
+  </article>
+</div>
+{% endblock %}

@@ -1,7 +1,17 @@
-Django>=6.0
-psycopg[binary]
-dj-database-url
+# Versões fixadas para que o build seja reproduzível.
+#
+# Sem pin, um deploy futuro pode instalar uma versão maior com mudança
+# incompatível e derrubar a produção sem que nenhuma linha do projeto tenha
+# mudado — risco real com autoDeploy ligado no Render.
+#
+# Para atualizar de forma controlada:
+#   pip install --upgrade <pacote> && pip freeze | grep <pacote>
+# e rode a suíte de testes antes de commitar a nova versão.
 
-gunicorn
-waitress
-whitenoise
+Django==6.0.6
+psycopg[binary]==3.3.4
+dj-database-url==3.1.2
+python-dotenv==1.2.2
+
+gunicorn==25.3.0
+whitenoise==6.12.0

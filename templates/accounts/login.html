@@ -1,29 +1,36 @@
 {% extends 'base.html' %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Entrar - MX Odontologia{% endblock %}
+
+{% block header %}Acesso ao sistema{% endblock %}
 
 {% block content %}
 <div class="page-intro">
   <h2>Entrar</h2>
-  <p>Faça login para acessar o sistema com a mesma experiência de um painel SaaS.</p>
+  <p>Acesse com o usuário e senha fornecidos pela clínica. Pacientes recebem as credenciais de acesso por e-mail.</p>
 </div>
 
-<div class="auth-grid">
+<div class="auth-grid auth-grid-single">
   <article class="auth-panel">
     <h3>Login</h3>
+    {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
     <form method="post" novalidate>
       {% csrf_token %}
-      {{ form.non_field_errors }}
+      <input type="hidden" name="next" value="{{ next }}">
       <div class="field">
-        <label for="id_username">Usuário</label>
-        {{ form.username }}
+        <label for="id_username">Usuário ou e-mail</label>
+        <input type="text" id="id_username" name="username" value="{{ username }}" autofocus autocomplete="username" required>
       </div>
       <div class="field">
         <label for="id_password">Senha</label>
-        {{ form.password }}
+        <input type="password" id="id_password" name="password" autocomplete="current-password" required>
       </div>
-      <button type="submit" class="button">Entrar</button>
-      <p class="panel-subtitle" style="margin-top: 14px; text-align: center;">Não tem conta? <a href="{% url 'register' %}">Crie uma conta</a>.</p>
+      <button class="button" type="submit">Entrar</button>
+      <p class="panel-subtitle auth-links">
+        <a href="{% url 'password_reset' %}">Esqueci minha senha</a>
+      </p>
     </form>
   </article>
 </div>

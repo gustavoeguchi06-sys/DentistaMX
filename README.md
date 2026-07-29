@@ -1,109 +1,101 @@
-# MX Odontologia Pro
+# MX Odontologia
 
-Sistema de gestão odontológica construído com Django. O projeto está organizado com uma estrutura padrão de backend, templates reutilizáveis, arquivos estáticos e um app principal para operações da clínica.
-
-## Visão geral
-
-O projeto inclui:
-- Estrutura Django padrão (`manage.py`, `mxodontologia/`, app `clinic/`)
-- Templates em `templates/`
-- CSS em `static/`
-- Dashboard e páginas para pacientes, agenda, prontuários, estoque, financeiro, relatórios e administração
-- Funções de cadastro, criação de registros e exportação CSV
-- Configuração pronta para deploy no Render com PostgreSQL
+Sistema de gestão para clínica odontológica, em Django: cadastro de pacientes,
+agenda, prontuários e um portal onde o paciente acompanha os próprios dados.
 
 ## Requisitos
 
-- Python 3.14+
-- Django 6.0+
-- PostgreSQL para produção
-- Virtualenv (recomendado)
+- Python 3.12+
+- PostgreSQL (produção) — SQLite é aceito apenas em desenvolvimento
 
-## Instalação local
+## Instalação
 
-1. Clone o projeto:
-   ```bash
-   git clone <repo> .
-   ```
+```bash
+python -m venv .venv
+.venv\Scripts\Activate.ps1        # Linux/macOS: source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env              # e preencha os valores
+python manage.py migrate
+python manage.py criar_dentista   # cria o acesso da profissional
+python manage.py runserver
+```
 
-2. Crie e ative o ambiente virtual:
-   ```bash
-   python -m venv .venv
-   .venv\Scripts\Activate.ps1
-   ```
+Acesse `http://127.0.0.1:8000/`.
 
-3. Instale dependências:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Configuração
 
-4. Crie um arquivo `.env` a partir de `.env.example` e ajuste as credenciais PostgreSQL:
-   ```bash
-   copy .env.example .env
-   ```
+Toda configuração vem de variáveis de ambiente — veja `.env.example`. Dois
+comportamentos importantes:
 
-5. Para usar PostgreSQL local, defina `DATABASE_URL` ou as variáveis individuais `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST` e `POSTGRES_PORT`.
+- **`DEBUG` é `False` por padrão.** Para desenvolver, defina `DEBUG=True`
+  explicitamente. Assim, uma variável que não chega ao processo em produção
+  nunca resulta em modo de depuração ligado.
+- **`SECRET_KEY` é obrigatória quando `DEBUG=False`.** A aplicação se recusa a
+  subir sem ela, em vez de servir requisições com uma chave conhecida (o que
+  permitiria forjar sessões e tokens de redefinição de senha).
 
-6. Se quiser usar SQLite apenas para testes rápidos, adicione `USE_SQLITE_FALLBACK=true` em `.env`.
+## Perfis de acesso
 
-7. Rode as migrations:
-   ```bash
-   python manage.py migrate
-   ```
+| Perfil | Como é criado | Acesso |
+|---|---|---|
+| Dentista | `python manage.py criar_dentista` | Dashboard, pacientes, agenda, prontuários |
+| Paciente | Automaticamente ao cadastrar o paciente | Apenas o portal com os próprios dados |
 
-8. Execute o servidor:
-   ```bash
-   python manage.py runserver
-   ```
+O paciente recebe uma senha temporária por e-mail e é obrigado a trocá-la no
+primeiro acesso.
 
-9. Acesse `http://127.0.0.1:8000/`.
+## Decisões de projeto que não devem ser revertidas
 
-## Deploy no Render
+Estas escolhas parecem restritivas até se entender o motivo:
 
-O projeto já está configurado para Render usando `render.yaml`.
+- **Paciente é arquivado, nunca excluído.** Prontuário odontológico tem prazo
+  legal de guarda e é dado pessoal sensível de saúde. As FKs usam `PROTECT`
+  para que remover um cadastro não destrua histórico clínico por cascata.
+- **Prontuário não tem rota de exclusão.** Correções entram como um novo
+  registro descrevendo a correção.
+- **Consulta é cancelada, não apagada.** O histórico de desmarcações é
+  informação clínica.
+- **Toda ação destrutiva exige POST com token CSRF.** Com GET, um `<img src>`
+  numa página qualquer — ou o prefetch do navegador — bastaria para disparar a
+  ação sem nenhum clique.
+- **O bloqueio de login conta por (IP, usuário).** Contar apenas por conta
+  permitiria manter a dentista permanentemente fora do sistema errando a senha
+  de propósito.
+- **Acesso a dado clínico é auditado** em `EventoAuditoria`, que é append-only.
 
-- Build command: `pip install -r requirements.txt && python manage.py collectstatic --noinput`
-- Start command: `gunicorn mxodontologia.wsgi:application --bind 0.0.0.0:$PORT`
+## Comandos úteis
 
-Variáveis de ambiente recomendadas:
-- `SECRET_KEY`
-- `DEBUG=False`
-- `ALLOWED_HOSTS=your-app.onrender.com`
-- `DATABASE_URL=postgres://user:password@host:port/dbname`
-- `RENDER_EXTERNAL_HOSTNAME=your-app.onrender.com`
+```bash
+python manage.py test                      # suíte completa
+python manage.py auditar_staff             # lista contas administrativas suspeitas
+python manage.py auditar_staff --strict    # falha se houver conta inesperada (CI/deploy)
+python manage.py check --deploy            # checagem de segurança de produção
+python manage.py seed_demo                 # dados de exemplo (só com DEBUG=True)
+```
 
-No Render, ligue o serviço de banco PostgreSQL e copie a URL gerada para `DATABASE_URL`.
+## Estrutura
 
-## Estrutura de pastas
+```
+mxodontologia/     configurações do projeto
+clinic/
+  models.py        entidades e regras de integridade
+  services/        casos de uso, transações e auditoria
+  views.py         camada HTTP (fina — a regra vive em services/)
+  forms.py         validação de entrada
+  tests/           testes de regressão das falhas já corrigidas
+templates/         HTML
+static/            CSS e JS
+```
 
-- `mxodontologia/` - configurações do projeto
-- `clinic/` - app principal com models, views, forms e URLs
-- `templates/` - arquivos HTML do frontend
-- `static/` - CSS e outros ativos
+## Deploy
 
-## Banco de dados
+Configurado para Render (`render.yaml`). O `SECRET_KEY` é gerado pelo próprio
+Render (`generateValue: true`) e nunca fica no repositório; credenciais de
+e-mail e `ALLOWED_HOSTS` são preenchidos no painel (`sync: false`).
 
-O projeto usa PostgreSQL no deploy.
+Antes de publicar, confirme:
 
-Para o Render, configure o banco PostgreSQL no painel e use a variável `DATABASE_URL`.
-
-Para testes locais rápidos sem PostgreSQL, defina `USE_SQLITE_FALLBACK=true` em `.env`, mas em produção o recomendado é usar PostgreSQL.
-
-## Status atual
-
-- Páginas principais e formulários já conectados ao banco
-- Exportação de pacientes para CSV implementada
-- Responsividade em celular melhorada
-- Validação de campo de nome/número adicionada aos formulários
-
-## Próximos passos
-
-- Adicionar edição/exclusão de registros
-- Implementar autenticação de usuário
-- Criar relatórios mais avançados e filtros dinâmicos
-- Refatorar interfaces para maior usabilidade móvel
-
-
-## atualização de testes
-
-teste de sincronização
+```bash
+python manage.py check --deploy    # precisa terminar sem nenhum aviso
+python manage.py auditar_staff     # nenhuma conta administrativa inesperada
+```

@@ -1,0 +1,32 @@
+[project]
+name = "mxodontologia"
+version = "1.0.0"
+description = "Sistema de gestão para clínica odontológica"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+exclude = ["migrations", "staticfiles", ".venv", "venv"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # bugbear
+    "DJ",   # regras específicas de Django
+    "S",    # bandit: falhas de segurança
+    "UP",   # pyupgrade
+]
+ignore = [
+    "S101",  # assert é o vocabulário natural dos testes
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Testes exercem senhas e credenciais de propósito.
+"clinic/tests/*" = ["S105", "S106"]
+"mxodontologia/settings.py" = ["S105"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["clinic", "mxodontologia"]

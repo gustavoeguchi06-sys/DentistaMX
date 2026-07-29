@@ -1,0 +1,20 @@
+{% if pagina.paginator.num_pages > 1 %}
+  <nav class="pagination" aria-label="Paginação">
+    {% if pagina.has_previous %}
+      <a class="button secondary" href="?page={{ pagina.previous_page_number }}{% if busca %}&q={{ busca|urlencode }}{% endif %}">Anterior</a>
+    {% else %}
+      <span class="button secondary is-disabled" aria-disabled="true">Anterior</span>
+    {% endif %}
+
+    <span class="pagination-status">
+      Página {{ pagina.number }} de {{ pagina.paginator.num_pages }}
+      <small>({{ pagina.paginator.count }} registro{{ pagina.paginator.count|pluralize }})</small>
+    </span>
+
+    {% if pagina.has_next %}
+      <a class="button secondary" href="?page={{ pagina.next_page_number }}{% if busca %}&q={{ busca|urlencode }}{% endif %}">Próxima</a>
+    {% else %}
+      <span class="button secondary is-disabled" aria-disabled="true">Próxima</span>
+    {% endif %}
+  </nav>
+{% endif %}

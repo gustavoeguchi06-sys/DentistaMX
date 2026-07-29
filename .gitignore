@@ -2,28 +2,39 @@
 __pycache__/
 *.py[cod]
 *$py.class
-*.sqlite3
 *.pyc
 *.pyo
 *.pyd
+venv/
+.venv/
+
+# Segredos — nunca versionar
+.env
 *.env
 *.env.*
 !.env.example
-venv/
-.venv/
-.env
+
+# Banco de dados local
+*.sqlite3
+*.sqlite3-journal
+*.db
 
 # Django
 *.log
 staticfiles/
 media/
 
-# VS Code
+# Ferramentas
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editores
 .vscode/
+.idea/
 
-# macOS
+# Sistema operacional
 .DS_Store
-
-# OneDrive
 Thumbs.db
 Desktop.ini

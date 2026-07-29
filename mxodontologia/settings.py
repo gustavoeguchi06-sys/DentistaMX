@@ -12,21 +12,39 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Carrega o .env do desenvolvimento. `override=False` garante que variáveis já
+# presentes no ambiente (as do Render, do CI ou do shell) sempre vençam o
+# arquivo — em produção não existe .env e nada aqui tem efeito.
+load_dotenv(BASE_DIR / '.env', override=False)
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-key')
+def _flag(nome, padrao='false'):
+    return os.getenv(nome, padrao).strip().lower() in ('true', '1', 'yes')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# O default para deploy é False, mas sem SECRET_KEY definida localmente o app ainda pode subir com o fallback acima.
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+# O default é o estado SEGURO: para ligar o modo de desenvolvimento é preciso
+# pedir explicitamente com DEBUG=True. Assim, uma variável de ambiente que não
+# chega ao processo em produção nunca resulta em DEBUG ligado.
+DEBUG = _flag('DEBUG', 'false')
+
+# Em produção a chave é obrigatória e o processo se recusa a subir sem ela.
+# Falhar no boot é muito melhor do que servir requisições com uma chave
+# conhecida, que permitiria forjar sessões e tokens de redefinição de senha.
+SECRET_KEY = os.getenv('SECRET_KEY', '').strip()
+if not DEBUG and (not SECRET_KEY or SECRET_KEY.startswith('django-insecure')):
+    raise ImproperlyConfigured(
+        'SECRET_KEY de produção ausente ou insegura. Defina a variável de ambiente '
+        'SECRET_KEY com um valor aleatório e secreto antes de subir a aplicação.'
+    )
+SECRET_KEY = SECRET_KEY or 'django-insecure-somente-para-desenvolvimento-local'
 
 # Hosts aceitos no deploy
 # - Netlify costuma expor o domínio via URL (ou você pode setar ALLOWED_HOSTS no Netlify)
@@ -99,7 +117,10 @@ POSTGRES_USER = os.getenv('POSTGRES_USER')
 POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD')
 POSTGRES_HOST = os.getenv('POSTGRES_HOST', 'localhost')
 POSTGRES_PORT = os.getenv('POSTGRES_PORT', '5432')
-USE_SQLITE_FALLBACK = os.getenv('USE_SQLITE_FALLBACK', 'true' if DEBUG else 'false').lower() in ('true', '1', 'yes')
+# O fallback para SQLite só existe em desenvolvimento. Em produção, a ausência
+# de configuração de banco deve derrubar o boot, e não fazer a aplicação gravar
+# dados de paciente num arquivo local que some no próximo deploy.
+USE_SQLITE_FALLBACK = _flag('USE_SQLITE_FALLBACK', 'true' if DEBUG else 'false')
 
 if DATABASE_URL:
     DATABASES = {
@@ -129,8 +150,10 @@ elif USE_SQLITE_FALLBACK:
         }
     }
 else:
-    raise RuntimeError(
-        'PostgreSQL configuration missing. Set DATABASE_URL or POSTGRES_DB/POSTGRES_USER/POSTGRES_PASSWORD.'
+    raise ImproperlyConfigured(
+        'Configuração de banco ausente. Defina DATABASE_URL ou o trio '
+        'POSTGRES_DB/POSTGRES_USER/POSTGRES_PASSWORD. O fallback para SQLite só '
+        'é permitido em desenvolvimento (USE_SQLITE_FALLBACK=true).'
     )
 
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
@@ -146,14 +169,34 @@ for host in ALLOWED_HOSTS:
     elif host != 'localhost':
         CSRF_TRUSTED_ORIGINS.append(f'https://{host}')
 
+# --- Segurança de transporte e de cookies -----------------------------------
+# Todos os toggles seguem `not DEBUG`: ligados em produção, desligados no
+# desenvolvimento local (onde não há TLS e o redirect quebraria o runserver).
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = not DEBUG
+SECURE_HSTS_SECONDS = 0 if DEBUG else 31536000  # 1 ano
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+
 SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+# A recepção da clínica costuma usar máquina compartilhada: a sessão não deve
+# sobreviver ao fechamento do navegador nem ficar aberta indefinidamente.
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 60 * 60 * 8  # 8 horas
+
 CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+X_FRAME_OPTIONS = 'DENY'
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -166,9 +209,36 @@ DATE_INPUT_FORMATS = ['%d/%m/%Y']
 DATETIME_FORMAT = 'd/m/Y H:i'
 
 # Authentication redirects
-LOGIN_URL = '/'
-LOGIN_REDIRECT_URL = '/pacientes/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
+
+# --- Bloqueio de login -------------------------------------------------------
+# O bloqueio é contado por (IP, usuário) e não apenas por conta. Contar só por
+# conta permitiria a qualquer pessoa manter a dentista permanentemente fora do
+# sistema errando a senha de propósito — negação de serviço de custo zero num
+# sistema de profissional única.
+LOGIN_MAX_ATTEMPTS = int(os.getenv('LOGIN_MAX_ATTEMPTS', '5'))
+LOGIN_LOCKOUT_MINUTES = int(os.getenv('LOGIN_LOCKOUT_MINUTES', '15'))
+# Janela em que as tentativas falhas são somadas.
+LOGIN_ATTEMPT_WINDOW_MINUTES = int(os.getenv('LOGIN_ATTEMPT_WINDOW_MINUTES', '15'))
+# Quantos dias de histórico de tentativas manter (trilha de auditoria).
+LOGIN_ATTEMPT_RETENTION_DAYS = int(os.getenv('LOGIN_ATTEMPT_RETENTION_DAYS', '90'))
+
+# E-mail (recuperação de senha e credenciais de pacientes)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = _flag('EMAIL_USE_TLS', 'true')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER or 'nao-responda@mxodontologia.local')
+
+if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 2  # 2 horas
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -192,5 +262,50 @@ AUTH_PASSWORD_VALIDATORS = [
 STORAGES = {
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
+
+# --- Logging -----------------------------------------------------------------
+# Saída em stdout: é o que Render, Docker e systemd coletam. O logger
+# 'clinic.audit' concentra os eventos sobre dado clínico (quem viu, alterou ou
+# arquivou o quê) e deve ser preservado por exigência de prestação de contas.
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'padrao': {
+            'format': '{asctime} {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'padrao',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'clinic': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
+        'clinic.audit': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }

@@ -1,58 +1,72 @@
-from django.core.management.base import BaseCommand
+from datetime import timedelta
+
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
 from django.utils import timezone
-from django.contrib.auth import get_user_model
-from clinic.models import Paciente, Consulta, EstoqueItem, TransacaoFinanceira, Prontuario
+
+from clinic.models import Consulta, Dentista, Paciente, Prontuario, StatusConsulta
+
 
 class Command(BaseCommand):
-    help = 'Seed demo user and sample data for presentation'
+    help = 'Cria pacientes, consultas e prontuários de exemplo para apresentação/testes.'
 
+    @transaction.atomic
     def handle(self, *args, **options):
-        User = get_user_model()
-        demo, created = User.objects.get_or_create(username='demo', defaults={'email':'demo@example.com','is_staff':True})
-        if created or not demo.check_password('demo123'):
-            demo.set_password('demo123')
-            demo.save()
-            self.stdout.write(self.style.SUCCESS('Created demo user demo/demo123'))
-        else:
-            self.stdout.write('Demo user exists')
+        # Dados de demonstração nunca devem alcançar um banco de produção: seria
+        # impossível distinguir paciente fictício de paciente real depois.
+        from django.conf import settings
+        if not settings.DEBUG:
+            raise CommandError(
+                'seed_demo só roda com DEBUG=True. Em produção este comando criaria '
+                'pacientes fictícios indistinguíveis dos reais.'
+            )
 
-        # create sample patients
-        pacientes = [
-            {'nome':'João Silva','data_nascimento':'1990-05-12','telefone':'(11) 99999-0001','especialidade':'Ortodontia'},
-            {'nome':'Maria Souza','data_nascimento':'1985-09-22','telefone':'(11) 99999-0002','especialidade':'Endodontia'},
-            {'nome':'Carlos Santos','data_nascimento':'1978-03-11','telefone':'(11) 99999-0003','especialidade':'Periodontia'},
+        dentista, _ = Dentista.objects.get_or_create(
+            nome='Dra. Responsável',
+            defaults={'cro': 'CRO-SP 00000'},
+        )
+
+        exemplos = [
+            ('João Silva', '1990-05-12', '11999990001', 'joao.demo@example.com', 'Ortodontia'),
+            ('Maria Souza', '1985-09-22', '11999990002', 'maria.demo@example.com', 'Endodontia'),
+            ('Carlos Santos', '1978-03-11', '11999990003', 'carlos.demo@example.com', 'Periodontia'),
         ]
-        for p in pacientes:
-            obj, created = Paciente.objects.get_or_create(nome=p['nome'], defaults={
-                'data_nascimento':p['data_nascimento'],'telefone':p['telefone'],'email':'','especialidade':p['especialidade']
-            })
-            if created:
-                self.stdout.write(self.style.SUCCESS(f"Created paciente {obj.nome}"))
+        for nome, nascimento, telefone, email, especialidade in exemplos:
+            paciente, criado = Paciente.objects.get_or_create(
+                nome=nome,
+                defaults={
+                    'data_nascimento': nascimento,
+                    'telefone': telefone,
+                    'email': email,
+                    'especialidade': especialidade,
+                },
+            )
+            if criado:
+                self.stdout.write(self.style.SUCCESS(f'Paciente de exemplo criado: {paciente.nome}'))
 
-        # create estoque items
-        estoque_items = [
-            {'nome':'Luvas','quantidade':50,'unidade':'un','nivel_alerta':'Normal'},
-            {'nome':'Máscaras','quantidade':30,'unidade':'un','nivel_alerta':'Normal'},
-            {'nome':'Anestésico','quantidade':5,'unidade':'amp','nivel_alerta':'Baixo'},
-        ]
-        for item in estoque_items:
-            obj, created = EstoqueItem.objects.get_or_create(nome=item['nome'], defaults={'quantidade':item['quantidade'],'unidade':item['unidade'],'nivel_alerta':item['nivel_alerta']})
-            if created:
-                self.stdout.write(self.style.SUCCESS(f"Created estoque item {obj.nome}"))
-
-        # create a consultation for first paciente
-        paciente = Paciente.objects.first()
+        paciente = Paciente.objects.ativos().first()
         if paciente:
-            Consulta.objects.get_or_create(paciente=paciente, data_consulta=timezone.now() + timezone.timedelta(days=1), defaults={'procedimento':'Limpeza','dentista':'Dr. Demo','status':'Agendada'})
-            self.stdout.write(self.style.SUCCESS('Created sample consulta'))
+            quando = (timezone.now() + timedelta(days=1)).replace(minute=0, second=0, microsecond=0)
+            Consulta.objects.get_or_create(
+                paciente=paciente,
+                dentista=dentista,
+                data_consulta=quando,
+                defaults={
+                    'procedimento': 'Limpeza',
+                    'status': StatusConsulta.AGENDADA,
+                    'duracao_min': 30,
+                },
+            )
+            Prontuario.objects.get_or_create(
+                paciente=paciente,
+                procedimento='Avaliação inicial',
+                defaults={
+                    'dentista': dentista,
+                    'observacoes': 'Paciente com boa saúde bucal.',
+                },
+            )
+            self.stdout.write(self.style.SUCCESS('Consulta e prontuário de exemplo criados.'))
 
-        # create financial transaction
-        TransacaoFinanceira.objects.get_or_create(descricao='Pagamento de consulta', data_operacao=timezone.now(), defaults={'tipo':'Receita','valor':120.00,'categoria':'Consultas'})
-        self.stdout.write(self.style.SUCCESS('Created sample transacao financeira'))
-
-        # create prontuario
-        if paciente:
-            Prontuario.objects.get_or_create(paciente=paciente, defaults={'procedimento':'Avaliação inicial','observacoes':'Paciente com boa saúde bucal.'})
-            self.stdout.write(self.style.SUCCESS('Created sample prontuario'))
-
-        self.stdout.write(self.style.SUCCESS('Seeding complete'))
+        self.stdout.write(self.style.SUCCESS(
+            'Seed concluído. Use "python manage.py criar_dentista" para criar o login da dentista.'
+        ))

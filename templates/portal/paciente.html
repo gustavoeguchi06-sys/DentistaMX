@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+
+{% block title %}Meu Portal - MX Odontologia{% endblock %}
+
+{% block header %}Meu Portal{% endblock %}
+
+{% block content %}
+<div class="page-intro">
+  <h2>Olá, {{ paciente.nome }}</h2>
+  <p>Aqui você acompanha seus dados cadastrais e o andamento do seu tratamento na MX Odontologia.</p>
+</div>
+
+<section class="grid portal-grid">
+  <article class="panel">
+    <div class="panel-header">
+      <div>
+        <h3>Meus dados</h3>
+        <p class="panel-subtitle">Informações cadastradas na clínica.</p>
+      </div>
+    </div>
+    <div class="status-block">
+      <p><strong>Nome:</strong> {{ paciente.nome }}</p>
+      <p><strong>Idade:</strong> {{ paciente.idade|default:'—' }}</p>
+      <p><strong>Telefone:</strong> {{ paciente.telefone|default:'—' }}</p>
+      <p><strong>E-mail:</strong> {{ paciente.email|default:'—' }}</p>
+      <p><strong>Acompanhamento:</strong> {{ paciente.especialidade|default:'—' }}</p>
+      <p><strong>Status:</strong> <span class="tag {{ paciente.status|lower }}">{{ paciente.get_status_display }}</span></p>
+    </div>
+  </article>
+
+  <article class="panel">
+    <div class="panel-header">
+      <div>
+        <h3>Última consulta</h3>
+        <p class="panel-subtitle">O que foi realizado no seu último atendimento.</p>
+      </div>
+    </div>
+    {% if ultima_consulta %}
+      <div class="status-block">
+        <p><strong>Data:</strong> {{ ultima_consulta.data_consulta|date:'d/m/Y H:i' }}</p>
+        <p><strong>Procedimento:</strong> {{ ultima_consulta.procedimento|default:'—' }}</p>
+        <p><strong>Status:</strong> <span class="tag {{ ultima_consulta.status|lower }}">{{ ultima_consulta.get_status_display }}</span></p>
+        {% if ultima_consulta.observacoes %}
+          <p><strong>Observações:</strong> {{ ultima_consulta.observacoes }}</p>
+        {% endif %}
+      </div>
+    {% elif ultimo_prontuario %}
+      <div class="status-block">
+        <p><strong>Data:</strong> {{ ultimo_prontuario.data_registro|date:'d/m/Y' }}</p>
+        <p><strong>Procedimento:</strong> {{ ultimo_prontuario.procedimento|default:'—' }}</p>
+        {% if ultimo_prontuario.observacoes %}
+          <p><strong>Observações:</strong> {{ ultimo_prontuario.observacoes }}</p>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">🦷</div>
+        <h3>Nenhum atendimento registrado ainda</h3>
+        <p>Assim que você for atendida(o), os detalhes aparecerão aqui.</p>
+      </div>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <div class="panel-header">
+      <div>
+        <h3>Próxima consulta</h3>
+        <p class="panel-subtitle">Seu próximo agendamento na clínica.</p>
+      </div>
+    </div>
+    {% if proxima_consulta %}
+      <div class="status-block">
+        <p><strong>Data:</strong> {{ proxima_consulta.data_consulta|date:'d/m/Y H:i' }}</p>
+        <p><strong>Procedimento previsto:</strong> {{ proxima_consulta.procedimento|default:'A definir' }}</p>
+        <p><strong>Status:</strong> <span class="tag {{ proxima_consulta.status|lower }}">{{ proxima_consulta.get_status_display }}</span></p>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-state-icon">📅</div>
+        <h3>Nenhuma consulta agendada</h3>
+        <p>Entre em contato com a clínica para agendar seu próximo atendimento.</p>
+      </div>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

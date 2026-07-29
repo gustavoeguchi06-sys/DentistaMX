@@ -1,20 +1,36 @@
+databases:
+  - name: mxodontologia-db
+    plan: basic-256mb
+    region: oregon
+    postgresMajorVersion: "16"
+
 services:
-  - type: web_service
+  - type: web
     name: mxodontologia-web
-    env: python
+    runtime: python
     plan: starter
     region: oregon
-    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput"
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput"
     startCommand: "gunicorn mxodontologia.wsgi:application --bind 0.0.0.0:$PORT"
+    healthCheckPath: /login/
     envVars:
       - key: DEBUG
         value: "False"
+      # generateValue faz o Render criar um segredo aleatório e guardá-lo fora
+      # do repositório. Nunca versione o valor real da SECRET_KEY.
       - key: SECRET_KEY
-        value: "replace_with_real_secret"
+        generateValue: true
       - key: ALLOWED_HOSTS
-        value: "your-app.onrender.com"
+        sync: false
       - key: DATABASE_URL
-        value: "replace_with_render_database_url"
-      - key: RENDER_EXTERNAL_HOSTNAME
-        value: "your-app.onrender.com"
+        fromDatabase:
+          name: mxodontologia-db
+          property: connectionString
+      # Credenciais de e-mail: preenchidas no painel do Render, nunca aqui.
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
     autoDeploy: true

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load icons %}
 
 {% block title %}Agenda - MX Odontologia Pro{% endblock %}
 
@@ -6,7 +7,10 @@
 
 {% block content %}
   <div class="page-header">
-    <h2>Compromissos do Dia</h2>
+    <div class="page-intro">
+      <h2>Compromissos da Clínica</h2>
+      <p>Acompanhe os agendamentos e o andamento de cada atendimento.</p>
+    </div>
     <div class="page-actions">
       <a class="button" href="{% url 'agenda_add' %}">Novo Agendamento</a>
     </div>
@@ -18,6 +22,7 @@
         <thead>
           <tr>
             <th>Horário</th>
+            <th>Duração</th>
             <th>Paciente</th>
             <th>Procedimento</th>
             <th>Responsável</th>
@@ -26,50 +31,44 @@
           </tr>
         </thead>
         <tbody>
-          {% for consulta in consultas %}
+          {% for consulta in pagina %}
             <tr>
-              <td>{{ consulta.data_consulta|date:'H:i' }}</td>
-              <td>{{ consulta.paciente.nome }}</td>
-              <td>{{ consulta.procedimento }}</td>
-              <td>{{ consulta.dentista }}</td>
-              <td><span class="tag {{ consulta.status|lower }}">{{ consulta.status }}</span></td>
+              <td data-label="Horário">{{ consulta.data_consulta|date:'d/m/Y H:i' }}</td>
+              <td data-label="Duração">{{ consulta.duracao_min }} min</td>
+              <td data-label="Paciente">{{ consulta.paciente.nome }}</td>
+              <td data-label="Procedimento">{{ consulta.procedimento|default:'—' }}</td>
+              <td data-label="Responsável">{{ consulta.dentista }}</td>
+              <td data-label="Status"><span class="tag {{ consulta.status|lower }}">{{ consulta.get_status_display }}</span></td>
               <td>
-                <button class="btn-delete" onclick="confirmDelete('{% url 'consulta_delete' consulta.id %}', '{{ consulta.paciente.nome }}')">
-                  🗑️ Excluir
-                </button>
+                {% if consulta.status != 'CANCELADA' %}
+                  {# Cancelar, não excluir: o histórico de desmarcações é informação clínica. #}
+                  <form method="post" action="{% url 'consulta_cancelar' consulta.id %}"
+                        onsubmit="return confirm('Cancelar o agendamento de {{ consulta.paciente.nome|escapejs }}?');">
+                    {% csrf_token %}
+                    <button class="btn-delete" type="submit">
+                      {% icon 'x' 'icon-sm' %} Cancelar
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="muted">Cancelada</span>
+                {% endif %}
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="6">Nenhum agendamento registrado.</td>
+              <td colspan="7">
+                <div class="empty-state">
+                  <div class="empty-state-icon">📅</div>
+                  <h3>Nenhum agendamento registrado</h3>
+                  <p>Crie o primeiro compromisso para começar a organizar a agenda da clínica.</p>
+                  <a class="button" href="{% url 'agenda_add' %}">Novo agendamento</a>
+                </div>
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+    {% include 'partials/paginacao.html' %}
   </article>
-
-  <style>
-    .btn-delete {
-      background-color: #dc3545;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background-color 0.2s;
-    }
-    .btn-delete:hover {
-      background-color: #c82333;
-    }
-  </style>
-
-  <script>
-    function confirmDelete(url, name) {
-      if (confirm(`Tem certeza que deseja excluir o agendamento de "${name}"?`)) {
-        window.location.href = url;
-      }
-    }
-  </script>
 {% endblock %}

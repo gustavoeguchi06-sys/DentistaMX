@@ -1,424 +1,358 @@
 import csv
+import logging
+
+from django import forms
+from django.contrib import messages
+from django.contrib.auth import (
+    get_user_model,
+    login as auth_login,
+    logout as auth_logout,
+    update_session_auth_hash,
+)
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db import transaction
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
-from .forms import (
-    ConsultaForm,
-    EstoqueItemForm,
-    PacienteForm,
-    PermissaoForm,
-    ProntuarioForm,
-    RelatorioForm,
-    TransacaoFinanceiraForm,
-    UsuarioForm,
-)
+from . import services
+from .decorators import dentista_required, paciente_required
+from .forms import ConsultaForm, PacienteForm, ProntuarioForm
 from .models import (
+    AcaoAuditoria,
     Consulta,
-    EstoqueItem,
     Paciente,
+    PerfilSeguranca,
     Prontuario,
-    Relatorio,
-    TransacaoFinanceira,
-    Usuario,
+    StatusConsulta,
 )
-from django.test import Client
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.contrib.auth import get_user_model, login as auth_login, logout as auth_logout
+
+logger = logging.getLogger('clinic')
+
+User = get_user_model()
+
+TAMANHO_PAGINA = 25
+
+# Mensagem única para qualquer falha de login. Diferenciar "usuário não existe"
+# de "senha errada" — ou revelar que uma conta está bloqueada — entrega ao
+# atacante a lista de contas válidas do sistema.
+ERRO_LOGIN_GENERICO = 'Usuário ou senha inválidos.'
 
 
-def ensure_demo_user():
-    User = get_user_model()
-    demo, created = User.objects.get_or_create(
-        username='demo',
-        defaults={'email': 'demo@example.com', 'is_staff': True},
-    )
-    if created or not demo.check_password('demo123'):
-        demo.set_password('demo123')
-        demo.save()
-    return demo
+def _redirect_pos_login(user):
+    if user.is_staff:
+        return redirect('dashboard')
+    return redirect('portal_paciente')
 
 
-def dashboard(request):
+def _paginar(request, queryset):
+    paginator = Paginator(queryset, TAMANHO_PAGINA)
+    return paginator.get_page(request.GET.get('page'))
+
+
+def login_view(request):
     if request.user.is_authenticated:
-        today = timezone.localdate()
-        pacientes_count = Paciente.objects.count()
-        agenda_today = Consulta.objects.filter(
-            data_consulta__date=today
-        ).select_related('paciente').order_by('data_consulta')[:5]
-        agenda_count = Consulta.objects.filter(data_consulta__date=today).count()
-        recent_pacientes = Paciente.objects.order_by('-data_cadastro')[:5]
-        prontuarios_count = Prontuario.objects.count()
-        relatorios_count = Relatorio.objects.count()
-        financeiro_mensal = TransacaoFinanceira.objects.filter(
-            data_operacao__year=today.year,
-            data_operacao__month=today.month,
-        )
-        receitas = sum(t.valor for t in financeiro_mensal if t.tipo == 'Receita')
-        despesas = sum(t.valor for t in financeiro_mensal if t.tipo == 'Despesa')
-        saldo = receitas - despesas
+        return _redirect_pos_login(request.user)
 
-        daily_summary = {}
-        for transacao in financeiro_mensal:
-            dia = transacao.data_operacao.day
-            if dia not in daily_summary:
-                daily_summary[dia] = {
-                    'label': transacao.data_operacao.strftime('%d/%m'),
-                    'receitas': 0.0,
-                    'despesas': 0.0,
-                }
-            if transacao.tipo == 'Receita':
-                daily_summary[dia]['receitas'] += float(transacao.valor)
-            else:
-                daily_summary[dia]['despesas'] += float(transacao.valor)
-
-        chart_labels = []
-        chart_receitas = []
-        chart_despesas = []
-        for dia in sorted(daily_summary):
-            chart_labels.append(daily_summary[dia]['label'])
-            chart_receitas.append(daily_summary[dia]['receitas'])
-            chart_despesas.append(daily_summary[dia]['despesas'])
-
-        low_stock_items = EstoqueItem.objects.filter(
-            nivel_alerta__in=['Baixo', 'Crítico']
-        ).order_by('nivel_alerta', 'nome')[:4]
-        stock_alert_count = EstoqueItem.objects.filter(
-            nivel_alerta__in=['Baixo', 'Crítico']
-        ).count()
-        return render(request, 'dashboard/dashboard.html', {
-            'pacientes_count': pacientes_count,
-            'agenda_today': agenda_today,
-            'agenda_count': agenda_count,
-            'recent_pacientes': recent_pacientes,
-            'prontuarios_count': prontuarios_count,
-            'relatorios_count': relatorios_count,
-            'receitas': receitas,
-            'despesas': despesas,
-            'saldo': saldo,
-            'chart_labels': chart_labels,
-            'chart_receitas': chart_receitas,
-            'chart_despesas': chart_despesas,
-            'low_stock_items': low_stock_items,
-            'stock_alert_count': stock_alert_count,
-        })
-
-    next_url = request.POST.get('next') or request.GET.get('next') or None
-    if next_url in ('', 'None'):
-        next_url = None
-    form_type = request.POST.get('form_type') if request.method == 'POST' else None
-    ensure_demo_user()
-    login_form = AuthenticationForm(request, data=request.POST if form_type == 'login' else None, prefix='login')
-    register_form = UserCreationForm(request.POST if form_type == 'register' else None, prefix='register')
+    next_url = request.POST.get('next') or request.GET.get('next') or ''
+    error = None
+    username = ''
 
     if request.method == 'POST':
-        if form_type == 'login' and login_form.is_valid():
-            auth_login(request, login_form.get_user())
-            return redirect(next_url or 'pacientes')
-        if form_type == 'register' and register_form.is_valid():
-            user = register_form.save()
-            auth_login(request, user)
-            return redirect(next_url or 'pacientes')
+        username = request.POST.get('username', '').strip()
+        password = request.POST.get('password', '')
 
-    return render(request, 'dashboard/dashboard.html', {
-        'login_form': login_form,
-        'register_form': register_form,
-        'demo_user': 'demo',
-        'demo_password': 'demo123',
+        usuario, motivo = services.autenticar(request, username, password)
+
+        if usuario is not None:
+            auth_login(request, usuario)
+            perfil = getattr(usuario, 'perfil_seguranca', None)
+            if perfil and perfil.deve_trocar_senha:
+                return redirect('trocar_senha')
+            if next_url and url_has_allowed_host_and_scheme(
+                next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+            ):
+                return redirect(next_url)
+            return _redirect_pos_login(usuario)
+
+        if motivo == 'bloqueado':
+            minutos = services.minutos_restantes_de_bloqueio(request, username)
+            error = (
+                'Muitas tentativas a partir deste dispositivo. Tente novamente em '
+                f'{minutos} minuto(s) ou use "Esqueci minha senha".'
+            )
+        else:
+            error = ERRO_LOGIN_GENERICO
+
+    return render(request, 'accounts/login.html', {
+        'error': error,
+        'username': username,
         'next': next_url,
     })
 
 
+@require_POST
 def logout_view(request):
+    """Logout exige POST.
+
+    Com GET, qualquer prefetch de navegador ou `<img src="/logout/">` numa
+    página de terceiros desconecta a usuária.
+    """
     auth_logout(request)
-    return redirect('dashboard')
+    return redirect('login')
+
+
+class TrocaSenhaForm(forms.Form):
+    nova_senha = forms.CharField(widget=forms.PasswordInput, label='Nova senha')
+    confirmar_senha = forms.CharField(widget=forms.PasswordInput, label='Confirme a nova senha')
+
+    def clean(self):
+        cleaned = super().clean()
+        senha1 = cleaned.get('nova_senha')
+        senha2 = cleaned.get('confirmar_senha')
+        if senha1 and senha2 and senha1 != senha2:
+            raise ValidationError('As senhas não coincidem.')
+        return cleaned
 
 
 @login_required
+def trocar_senha(request):
+    perfil, _ = PerfilSeguranca.objects.get_or_create(usuario=request.user)
+    form = TrocaSenhaForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        nova_senha = form.cleaned_data['nova_senha']
+        try:
+            validate_password(nova_senha, user=request.user)
+        except ValidationError as exc:
+            for erro in exc.messages:
+                form.add_error('nova_senha', erro)
+        else:
+            request.user.set_password(nova_senha)
+            request.user.save()
+            perfil.deve_trocar_senha = False
+            perfil.save(update_fields=['deve_trocar_senha'])
+            update_session_auth_hash(request, request.user)
+            logger.info('senha alterada usuario=%s', request.user.get_username())
+            messages.success(request, 'Senha atualizada com sucesso.')
+            return _redirect_pos_login(request.user)
+
+    return render(request, 'accounts/trocar_senha.html', {
+        'form': form,
+        'obrigatorio': perfil.deve_trocar_senha,
+    })
+
+
+@dentista_required
+def dashboard(request):
+    hoje = timezone.localdate()
+
+    agenda_hoje = (
+        Consulta.objects.do_dia(hoje)
+        .select_related('paciente', 'dentista')
+        .order_by('data_consulta')
+    )
+    proximas_consultas = (
+        Consulta.objects
+        .filter(data_consulta__date__gt=hoje, status=StatusConsulta.AGENDADA)
+        .select_related('paciente', 'dentista')
+        .order_by('data_consulta')[:5]
+    )
+
+    return render(request, 'dashboard/dashboard.html', {
+        'pacientes_count': Paciente.objects.ativos().count(),
+        'agenda_today': agenda_hoje[:8],
+        'agenda_count': agenda_hoje.count(),
+        'proximas_consultas': proximas_consultas,
+        'recent_pacientes': Paciente.objects.ativos()[:5],
+        'prontuarios_count': Prontuario.objects.count(),
+        'concluidas_mes': Consulta.objects.filter(
+            status=StatusConsulta.CONCLUIDA,
+            data_consulta__year=hoje.year,
+            data_consulta__month=hoje.month,
+        ).count(),
+    })
+
+
+@dentista_required
 def pacientes(request):
-    pacientes = Paciente.objects.all().order_by('-data_cadastro')
-    return render(request, 'pacientes/list.html', {'pacientes': pacientes})
+    busca = request.GET.get('q', '').strip()
+    queryset = Paciente.objects.ativos()
+    if busca:
+        queryset = queryset.filter(nome__icontains=busca)
+    return render(request, 'pacientes/list.html', {
+        'pagina': _paginar(request, queryset),
+        'busca': busca,
+    })
 
 
-@login_required
+@dentista_required
 def paciente_add(request):
     if request.method == 'POST':
         form = PacienteForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('pacientes')
+            paciente = form.save(commit=False)
+            try:
+                paciente, senha_temp = services.registrar_paciente(paciente, request=request)
+            except services.pacientes.EmailJaCadastrado:
+                form.add_error('email', 'Já existe uma conta cadastrada com este e-mail.')
+            else:
+                login_url = request.build_absolute_uri(reverse('login'))
+                # Só envia depois que a transação de cadastro confirmar: enviar
+                # antes arriscaria mandar credencial de um cadastro que falhou.
+                transaction.on_commit(
+                    lambda: services.pacientes.enviar_credenciais(paciente, senha_temp, login_url)
+                )
+                messages.success(
+                    request,
+                    f'Paciente cadastrado. As credenciais de acesso foram enviadas '
+                    f'para {paciente.email}.',
+                )
+                return redirect('pacientes')
     else:
         form = PacienteForm()
 
     return render(request, 'pacientes/form.html', {'form': form, 'cancel_url': reverse('pacientes')})
 
 
-@login_required
+@dentista_required
+def paciente_detail(request, pk):
+    paciente = get_object_or_404(Paciente, pk=pk)
+    services.registrar_evento(
+        request, AcaoAuditoria.VISUALIZAR, objeto=paciente,
+        descricao=f'Ficha clínica de {paciente.nome} acessada.',
+    )
+    return render(request, 'pacientes/detail.html', {
+        'paciente': paciente,
+        'consultas': paciente.consultas.select_related('dentista'),
+        'prontuarios': paciente.prontuarios.select_related('dentista'),
+    })
+
+
+@dentista_required
 def pacientes_export(request):
-    pacientes = Paciente.objects.all().order_by('nome')
-    response = HttpResponse(content_type='text/csv')
+    lista = Paciente.objects.ativos().order_by('nome')
+    services.registrar_evento(
+        request, AcaoAuditoria.EXPORTAR, objeto_tipo='Paciente',
+        descricao=f'Exportação CSV de {lista.count()} paciente(s).',
+    )
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="pacientes.csv"'
+    response.write('﻿')  # BOM: o Excel pt-BR precisa dele para acentuação
     writer = csv.writer(response)
     writer.writerow([
-        'Nome',
-        'Data Nascimento',
-        'Telefone',
-        'Email',
-        'Especialidade',
-        'Status',
-        'Data Cadastro',
+        'Nome', 'Data Nascimento', 'Telefone', 'Email',
+        'Especialidade', 'Status', 'Data Cadastro',
     ])
-    for paciente in pacientes:
+    for paciente in lista:
         writer.writerow([
             paciente.nome,
-            paciente.data_nascimento.strftime('%Y-%m-%d') if paciente.data_nascimento else '',
+            paciente.data_nascimento.strftime('%d/%m/%Y') if paciente.data_nascimento else '',
             paciente.telefone,
-            paciente.email,
+            paciente.email or '',
             paciente.especialidade,
-            paciente.status,
-            paciente.data_cadastro.strftime('%Y-%m-%d %H:%M'),
+            paciente.get_status_display(),
+            timezone.localtime(paciente.data_cadastro).strftime('%d/%m/%Y %H:%M'),
         ])
     return response
 
 
-@login_required
+@dentista_required
 def agenda(request):
-    consultas = Consulta.objects.select_related('paciente').order_by('data_consulta')
-    return render(request, 'agenda/list.html', {'consultas': consultas})
+    consultas = Consulta.objects.select_related('paciente', 'dentista').order_by('data_consulta')
+    return render(request, 'agenda/list.html', {'pagina': _paginar(request, consultas)})
 
 
-@login_required
+@dentista_required
 def agenda_add(request):
     if request.method == 'POST':
         form = ConsultaForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('agenda')
+            try:
+                services.agendar_consulta(form.instance, request=request)
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(request, 'Consulta agendada.')
+                return redirect('agenda')
     else:
-        form = ConsultaForm()
+        form = ConsultaForm(initial={'paciente': request.GET.get('paciente')})
     return render(request, 'agenda/form.html', {'form': form, 'cancel_url': reverse('agenda')})
 
 
-@login_required
+@dentista_required
 def prontuarios(request):
-    prontuarios = Prontuario.objects.select_related('paciente').order_by('-data_registro')
-    return render(request, 'prontuarios/list.html', {'prontuarios': prontuarios})
+    registros = Prontuario.objects.select_related('paciente', 'dentista')
+    return render(request, 'prontuarios/list.html', {'pagina': _paginar(request, registros)})
 
 
-@login_required
+@dentista_required
 def prontuario_add(request):
     if request.method == 'POST':
         form = ProntuarioForm(request.POST)
         if form.is_valid():
-            form.save()
+            prontuario = form.save()
+            services.registrar_evento(
+                request, AcaoAuditoria.CRIAR, objeto=prontuario,
+                descricao=f'Prontuário registrado para {prontuario.paciente.nome}.',
+            )
+            messages.success(request, 'Prontuário registrado.')
             return redirect('prontuarios')
     else:
-        form = ProntuarioForm()
+        form = ProntuarioForm(initial={'paciente': request.GET.get('paciente')})
     return render(request, 'prontuarios/form.html', {'form': form, 'cancel_url': reverse('prontuarios')})
 
 
-@login_required
-def estoque(request):
-    itens = EstoqueItem.objects.all().order_by('nome')
-    return render(request, 'estoque/list.html', {'itens': itens})
+@dentista_required
+@require_POST
+def paciente_arquivar(request, pk):
+    """Arquiva o cadastro. Exige POST com token CSRF.
 
-
-@login_required
-def estoque_add(request):
-    if request.method == 'POST':
-        form = EstoqueItemForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('estoque')
-    else:
-        form = EstoqueItemForm()
-    return render(request, 'estoque/form.html', {'form': form, 'cancel_url': reverse('estoque')})
-
-
-@login_required
-def estoque_relatorio(request):
-    itens = EstoqueItem.objects.filter(nivel_alerta__in=['Baixo', 'Crítico']).order_by('nivel_alerta', 'nome')
-    return render(request, 'estoque/report.html', {'itens': itens})
-
-
-@login_required
-def financeiro(request):
-    transacoes = TransacaoFinanceira.objects.all().order_by('-data_operacao')
-    now = timezone.localtime(timezone.now())
-    mensal = TransacaoFinanceira.objects.filter(
-        data_operacao__year=now.year,
-        data_operacao__month=now.month,
+    Antes esta operação respondia a GET e apagava o paciente junto com todas as
+    consultas e prontuários — um `<img src>` numa página qualquer bastava para
+    destruir histórico clínico.
+    """
+    paciente = get_object_or_404(Paciente, pk=pk)
+    services.arquivar_paciente(paciente, usuario_responsavel=request.user, request=request)
+    messages.success(
+        request,
+        f'Cadastro de {paciente.nome} arquivado. O histórico clínico foi preservado.',
     )
-    receitas = sum(t.valor for t in mensal if t.tipo == 'Receita')
-    despesas = sum(t.valor for t in mensal if t.tipo == 'Despesa')
-    saldo = receitas - despesas
-    return render(request, 'financeiro/list.html', {
-        'transacoes': transacoes,
-        'receitas': receitas,
-        'despesas': despesas,
-        'saldo': saldo,
-    })
-
-
-@login_required
-def financeiro_add(request):
-    if request.method == 'POST':
-        form = TransacaoFinanceiraForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('financeiro')
-    else:
-        form = TransacaoFinanceiraForm()
-    return render(request, 'financeiro/form.html', {'form': form, 'cancel_url': reverse('financeiro')})
-
-
-@login_required
-def financeiro_relatorio(request):
-    now = timezone.localtime(timezone.now())
-    mensal = TransacaoFinanceira.objects.filter(
-        data_operacao__year=now.year,
-        data_operacao__month=now.month,
-    )
-    receitas = sum(t.valor for t in mensal if t.tipo == 'Receita')
-    despesas = sum(t.valor for t in mensal if t.tipo == 'Despesa')
-    return render(request, 'financeiro/report.html', {
-        'mensal': mensal,
-        'receitas': receitas,
-        'despesas': despesas,
-        'saldo': receitas - despesas,
-        'periodo': now.strftime('%B/%Y'),
-    })
-
-
-@login_required
-def relatorios(request):
-    relatorios = Relatorio.objects.all().order_by('-data_geracao')
-    return render(request, 'relatorios/list.html', {'relatorios': relatorios})
-
-
-@login_required
-def relatorio_add(request):
-    if request.method == 'POST':
-        form = RelatorioForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('relatorios')
-    else:
-        form = RelatorioForm()
-    return render(request, 'relatorios/form.html', {'form': form, 'cancel_url': reverse('relatorios')})
-
-
-@login_required
-def administracao(request):
-    usuarios = Usuario.objects.all().order_by('nome')
-    return render(request, 'administracao/list.html', {'usuarios': usuarios})
-
-
-@login_required
-def administracao_add(request):
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('administracao')
-    else:
-        form = UsuarioForm()
-    return render(request, 'administracao/form.html', {'form': form, 'cancel_url': reverse('administracao')})
-
-
-@login_required
-def administracao_permissoes(request):
-    if request.method == 'POST':
-        form = PermissaoForm(request.POST)
-        if form.is_valid():
-            usuario = form.cleaned_data['usuario']
-            usuario.permissoes = form.cleaned_data['permissoes']
-            usuario.save()
-            return redirect('administracao')
-    else:
-        form = PermissaoForm()
-    return render(request, 'administracao/permissions.html', {'form': form, 'cancel_url': reverse('administracao')})
-
-
-@login_required
-def paciente_delete(request, pk):
-    try:
-        paciente = Paciente.objects.get(pk=pk)
-        paciente.delete()
-    except Paciente.DoesNotExist:
-        pass
     return redirect('pacientes')
 
 
-@login_required
-def consulta_delete(request, pk):
-    try:
-        consulta = Consulta.objects.get(pk=pk)
-        consulta.delete()
-    except Consulta.DoesNotExist:
-        pass
+@dentista_required
+@require_POST
+def consulta_cancelar(request, pk):
+    consulta = get_object_or_404(Consulta, pk=pk)
+    services.cancelar_consulta(consulta, request=request)
+    messages.success(request, 'Consulta cancelada.')
     return redirect('agenda')
 
 
-@login_required
-def prontuario_delete(request, pk):
-    try:
-        prontuario = Prontuario.objects.get(pk=pk)
-        prontuario.delete()
-    except Prontuario.DoesNotExist:
-        pass
-    return redirect('prontuarios')
-
-
-def check_pages(request):
-    client = Client()
-    User = get_user_model()
-    demo, created = User.objects.get_or_create(
-        username='demo',
-        defaults={'email': 'demo@example.com', 'is_staff': True}
-    )
-    if created:
-        demo.set_password('demo123')
-        demo.save()
-    client.login(username='demo', password='demo123')
-
-    paths = [
-        '/',
-        '/pacientes/',
-        '/agenda/',
-        '/prontuarios/',
-        '/estoque/',
-        '/financeiro/',
-        '/relatorios/',
-        '/administracao/',
-    ]
-    results = []
-    for p in paths:
-        try:
-            resp = client.get(p)
-            content = resp.content.decode('utf-8', errors='ignore')[:1000]
-            # try to extract <title>
-            import re
-            m = re.search(r'<title>(.*?)</title>', content, re.IGNORECASE|re.DOTALL)
-            title = m.group(1).strip() if m else ''
-            results.append({'path': p, 'status': resp.status_code, 'title': title})
-        except Exception as e:
-            results.append({'path': p, 'status': 'ERROR', 'title': str(e)})
-    return render(request, 'dashboard/check_pages.html', {'results': results})
-
-
-def register(request):
-    """Simple user registration using Django's built-in UserCreationForm.
-    After successful registration the user is logged in and redirected to dashboard.
-    """
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            auth_login(request, user)
-            return redirect('dashboard')
-    else:
-        form = UserCreationForm()
-    return render(request, 'accounts/register.html', {'form': form})
+@paciente_required
+def portal_paciente(request):
+    paciente = request.user.paciente_perfil
+    agora = timezone.now()
+    return render(request, 'portal/paciente.html', {
+        'paciente': paciente,
+        'proxima_consulta': (
+            paciente.consultas.ativas()
+            .filter(data_consulta__gte=agora)
+            .select_related('dentista')
+            .order_by('data_consulta')
+            .first()
+        ),
+        'ultima_consulta': (
+            paciente.consultas.filter(data_consulta__lt=agora)
+            .select_related('dentista')
+            .first()
+        ),
+        'ultimo_prontuario': paciente.prontuarios.first(),
+    })

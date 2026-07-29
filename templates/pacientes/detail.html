@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ paciente.nome }} - MX Odontologia Pro{% endblock %}
+
+{% block header %}Ficha do Paciente{% endblock %}
+
+{% block content %}
+  <div class="page-header">
+    <div class="page-intro">
+      <h2>{{ paciente.nome }}</h2>
+      <p>Dados cadastrais, histórico de consultas e prontuários deste paciente.</p>
+    </div>
+    <div class="page-actions">
+      <a class="button" href="{% url 'agenda_add' %}?paciente={{ paciente.id }}">Nova consulta</a>
+      <a class="button secondary" href="{% url 'prontuario_add' %}?paciente={{ paciente.id }}">Novo prontuário</a>
+      <a class="button secondary" href="{% url 'pacientes' %}">Voltar</a>
+    </div>
+  </div>
+
+  <section class="grid">
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>Dados cadastrais</h3>
+        </div>
+      </div>
+      <div class="status-block">
+        <p><strong>Idade:</strong> {{ paciente.idade|default:'—' }}</p>
+        <p><strong>Data de nascimento:</strong> {{ paciente.data_nascimento|date:'d/m/Y'|default:'—' }}</p>
+        <p><strong>Telefone:</strong> {{ paciente.telefone|default:'—' }}</p>
+        <p><strong>E-mail:</strong> {{ paciente.email|default:'—' }}</p>
+        <p><strong>Acompanhamento:</strong> {{ paciente.especialidade|default:'—' }}</p>
+        <p><strong>Status:</strong> <span class="tag {{ paciente.status|lower }}">{{ paciente.get_status_display }}</span></p>
+        <p><strong>Acesso ao portal:</strong>
+          {% if paciente.usuario %}
+            <span class="tag success">Ativo</span>
+          {% else %}
+            <span class="tag danger">Sem acesso</span>
+          {% endif %}
+        </p>
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-header">
+        <div>
+          <h3>Histórico de consultas</h3>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Procedimento</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for consulta in consultas %}
+              <tr>
+                <td data-label="Data">{{ consulta.data_consulta|date:'d/m/Y H:i' }}</td>
+                <td data-label="Procedimento">{{ consulta.procedimento|default:'—' }}</td>
+                <td data-label="Status"><span class="tag {{ consulta.status|lower }}">{{ consulta.get_status_display }}</span></td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="3">Nenhuma consulta registrada.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <article class="panel">
+    <div class="panel-header">
+      <div>
+        <h3>Prontuários</h3>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Procedimento</th>
+            <th>Observações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for prontuario in prontuarios %}
+            <tr>
+              <td data-label="Data">{{ prontuario.data_registro|date:'d/m/Y' }}</td>
+              <td data-label="Procedimento">{{ prontuario.procedimento|default:'—' }}</td>
+              <td data-label="Observações">{{ prontuario.observacoes|default:'—' }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="3">Nenhum prontuário registrado.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </article>
+{% endblock %}
