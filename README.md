@@ -496,6 +496,4 @@ constitui licença de uso.
 
 ---
 
-<div align="center">
-<sub>Desenvolvido com Django · Documentação e revisão de arquitetura assistidas por Claude</sub>
-</div>
+
